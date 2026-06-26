@@ -6,7 +6,9 @@ set(CMAKE_CXX_STANDARD 17)
 # ── Sources ────────────────────────────────────────────────────────────────
 add_library(CursorRing SHARED
     src/main.cpp
-    src/overlay.cpp
+    src/options.cpp
+    src/cursor_hook.cpp
+    src/cursor_compose.cpp
     src/settings.cpp
     imgui/imgui.cpp
     imgui/imgui_draw.cpp

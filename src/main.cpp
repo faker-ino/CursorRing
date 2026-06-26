@@ -1,13 +1,13 @@
 /*
  * CursorRing - GW2 Nexus Addon
- * Draws a customizable ring around the mouse cursor using ImGui.
+ * Bakes a customizable ring into the real cursor.
  */
 
 #include <Windows.h>
 #include "nexus/Nexus.h"   // Drop in from Nexus SDK
-#include "mumble/Mumble.h"
 #include <imgui/imgui.h>
-#include "overlay.h"
+#include "options.h"
+#include "cursor_hook.h"
 #include "settings.h"
 
 // ── Nexus boilerplate ──────────────────────────────────────────────────────
@@ -15,13 +15,10 @@
 AddonDefinition AddonDef = {};
 HMODULE hSelf             = nullptr;
 AddonAPI* APIDefs         = nullptr;
-NexusLinkData* NexusLink  = nullptr;
-Mumble::Data* MumbleLink  = nullptr;
 
 // Forward declarations
 void AddonLoad(AddonAPI* aApi);
 void AddonUnload();
-void AddonRender();
 void AddonOptions();
 
 // Called by Nexus to get addon metadata
@@ -37,7 +34,7 @@ extern "C" __declspec(dllexport) AddonDefinition* GetAddonDef()
     AddonDef.Description   = "Draws a customizable ring around your cursor.";
     AddonDef.Load          = AddonLoad;
     AddonDef.Unload        = AddonUnload;
-    AddonDef.Flags         = EAddonFlags_None;
+    AddonDef.Flags         = EAddonFlags_IsVolatile; // hooks SetCursor/SetClassLongPtr
     AddonDef.Provider      = EUpdateProvider_None;
     return &AddonDef;
 }
@@ -58,33 +55,25 @@ void AddonLoad(AddonAPI* aApi)
         (void* (*)(size_t, void*))APIDefs->ImguiMalloc,
         (void (*)(void*, void*))APIDefs->ImguiFree);
 
-    // Grab shared data pointers
-    NexusLink  = (NexusLinkData*)APIDefs->DataLink.Get("DL_NEXUS_LINK");
-    MumbleLink = (Mumble::Data*)APIDefs->DataLink.Get("DL_MUMBLE_LINK");
-
     Settings::Load(APIDefs->Paths.GetAddonDirectory("CursorRing"));
 
-    // Register our render and options callbacks
-    APIDefs->Renderer.Register(ERenderType_Render, AddonRender);
+    CursorHook::Install(APIDefs);
+
     APIDefs->Renderer.Register(ERenderType_OptionsRender, AddonOptions);
 }
 
 void AddonUnload()
 {
-    APIDefs->Renderer.Deregister(AddonRender);
     APIDefs->Renderer.Deregister(AddonOptions);
+
+    CursorHook::Uninstall();
 
     Settings::Save(APIDefs->Paths.GetAddonDirectory("CursorRing"));
 }
 
 // ── Render callbacks ───────────────────────────────────────────────────────
 
-void AddonRender()
-{
-    Overlay::Draw();
-}
-
 void AddonOptions()
 {
-    Overlay::DrawOptions();
+    Options::DrawOptions();
 }
