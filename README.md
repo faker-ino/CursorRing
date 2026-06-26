@@ -6,5 +6,4 @@ Draws a customizable ring around your cursor
 - Adjustable **radius**, **thickness**, and **segment count** (smoothness)
 - Full **RGBA color picker** with alpha
 
-<img width="662" height="683" alt="grafik" src="https://github.com/user-attachments/assets/0ebfd988-15e7-42ee-b8cb-3e6388bb6060" />
-
+<img width="663" height="681" alt="grafik" src="https://github.com/user-attachments/assets/c7186ecd-e38a-4b8f-927e-8828d2e4477e" />
