@@ -2,6 +2,8 @@
 #include "cursor_compose.h"
 #include <Windows.h>
 #include <unordered_map>
+#include <deque>
+#include <mutex>
 
 namespace
 {
@@ -18,20 +20,43 @@ namespace
     bool g_hookedSetClassLongPtrA = false;
     bool g_hookedSetClassLongPtrW = false;
 
+    // Guards every map below. The game can call SetCursor from a different
+    // thread than the one CursorHook::InvalidateCache() runs on (driven by
+    // the render/options UI), so the cache can't be touched lock-free.
+    std::mutex g_cacheMutex;
+
     // original (game) HCURSOR -> composite (ring-baked) HCURSOR
     std::unordered_map<HCURSOR, HCURSOR> g_origToComposite;
     // composite HCURSOR -> original (game) HCURSOR, so SetCursor's return
     // value (the previously active cursor) can be translated back to what
     // the game actually expects to see.
     std::unordered_map<HCURSOR, HCURSOR> g_compositeToOrig;
+    // Insertion order of g_origToComposite, oldest first, so the cache can
+    // be capped (see kMaxCachedComposites below).
+    std::deque<HCURSOR> g_insertOrder;
+
+    // Every cached composite holds a real GDI cursor object alive until
+    // explicitly destroyed, and entries are otherwise never evicted. A game
+    // that hands out fresh HCURSORs over time (resolution/fullscreen
+    // changes, device resets, per-session cursor reloads) would otherwise
+    // leak one GDI object per occurrence for the lifetime of the process.
+    // Windows caps a process at 10000 GDI objects by default; once that's
+    // exhausted CreateIconIndirect starts failing and the ring silently
+    // stops appearing for good. Capping the cache means the worst case is
+    // an evicted-but-still-active cursor getting rebuilt on next use, which
+    // is cheap, instead of the ring vanishing permanently.
+    constexpr size_t kMaxCachedComposites = 128;
 
     bool IsOurComposite(HCURSOR aCursor)
     {
+        std::lock_guard<std::mutex> lock(g_cacheMutex);
         return aCursor && g_compositeToOrig.find(aCursor) != g_compositeToOrig.end();
     }
 
     HCURSOR GetOrBuildComposite(HCURSOR aOriginal)
     {
+        std::lock_guard<std::mutex> lock(g_cacheMutex);
+
         auto it = g_origToComposite.find(aOriginal);
         if (it != g_origToComposite.end()) return it->second;
 
@@ -40,6 +65,21 @@ namespace
         {
             g_origToComposite[aOriginal] = composite;
             g_compositeToOrig[composite] = aOriginal;
+            g_insertOrder.push_back(aOriginal);
+
+            if (g_insertOrder.size() > kMaxCachedComposites)
+            {
+                HCURSOR oldest = g_insertOrder.front();
+                g_insertOrder.pop_front();
+
+                auto oldIt = g_origToComposite.find(oldest);
+                if (oldIt != g_origToComposite.end())
+                {
+                    DestroyIcon(oldIt->second);
+                    g_compositeToOrig.erase(oldIt->second);
+                    g_origToComposite.erase(oldIt);
+                }
+            }
         }
         return composite;
     }
@@ -49,6 +89,7 @@ namespace
     // handles untouched.
     HCURSOR ToLogical(HCURSOR aCursor)
     {
+        std::lock_guard<std::mutex> lock(g_cacheMutex);
         auto it = g_compositeToOrig.find(aCursor);
         return it == g_compositeToOrig.end() ? aCursor : it->second;
     }
@@ -88,12 +129,14 @@ namespace
 
     void DestroyCachedComposites()
     {
+        std::lock_guard<std::mutex> lock(g_cacheMutex);
         for (auto& [original, composite] : g_origToComposite)
         {
             if (composite != original) DestroyIcon(composite);
         }
         g_origToComposite.clear();
         g_compositeToOrig.clear();
+        g_insertOrder.clear();
     }
 }
 
