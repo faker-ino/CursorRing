@@ -26,6 +26,29 @@ static void DrawRingOptions(const char* title, Settings::RingSettings& ring, ImG
     ImGui::PopID();
 }
 
+static void DrawDotOptions()
+{
+    ImGui::PushID("Center Dot");
+    if (ImGui::CollapsingHeader("Center Dot"))
+    {
+        bool changed = false;
+        Settings::DotSettings& dot = Settings::Dot;
+
+        changed |= ImGui::Checkbox("Enabled", &dot.Enabled);
+        if (dot.Enabled)
+        {
+            changed |= ImGui::SliderFloat("Size", &dot.Size, 0.5f, 32.0f, "%.1f px");
+
+            ImGui::Spacing();
+            changed |= ImGui::ColorEdit4("Dot Color", dot.Color,
+                ImGuiColorEditFlags_DisplayRGB | ImGuiColorEditFlags_AlphaBar);
+        }
+
+        if (changed) CursorHook::InvalidateCache();
+    }
+    ImGui::PopID();
+}
+
 void Options::DrawOptions()
 {
     ImGui::TextDisabled("Cursor Ring");
@@ -33,6 +56,7 @@ void Options::DrawOptions()
 
     DrawRingOptions("Outer Ring", Settings::Outer, ImGuiTreeNodeFlags_DefaultOpen);
     DrawRingOptions("Inner Ring", Settings::Inner, ImGuiTreeNodeFlags_None);
+    DrawDotOptions();
 
     ImGui::Spacing();
     ImGui::TextDisabled("The ring is baked into the real cursor, so it tracks");

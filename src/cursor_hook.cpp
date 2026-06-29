@@ -103,7 +103,11 @@ namespace
         return ToLogical(prevReal);
     }
 
-    ULONG_PTR WINAPI Detour_SetClassLongPtrA(HWND hWnd, int nIndex, LONG_PTR dwNewLong)
+    // SetClassLongPtrA/W are identical in behavior (one byte-swaps a string
+    // arg we never touch, GCLP_HCURSOR is just a pointer either way), so both
+    // detours funnel through here with only the real function pointer
+    // differing.
+    ULONG_PTR Detour_SetClassLongCommon(SETCLASSLONGPTR_FN aRealFn, HWND hWnd, int nIndex, LONG_PTR dwNewLong)
     {
         if (nIndex == GCLP_HCURSOR)
         {
@@ -111,20 +115,18 @@ namespace
             if (hCursor && !IsOurComposite(hCursor))
                 dwNewLong = (LONG_PTR)GetOrBuildComposite(hCursor);
         }
-        ULONG_PTR prev = fpSetClassLongPtrA(hWnd, nIndex, dwNewLong);
+        ULONG_PTR prev = aRealFn(hWnd, nIndex, dwNewLong);
         return nIndex == GCLP_HCURSOR ? (ULONG_PTR)ToLogical((HCURSOR)prev) : prev;
+    }
+
+    ULONG_PTR WINAPI Detour_SetClassLongPtrA(HWND hWnd, int nIndex, LONG_PTR dwNewLong)
+    {
+        return Detour_SetClassLongCommon(fpSetClassLongPtrA, hWnd, nIndex, dwNewLong);
     }
 
     ULONG_PTR WINAPI Detour_SetClassLongPtrW(HWND hWnd, int nIndex, LONG_PTR dwNewLong)
     {
-        if (nIndex == GCLP_HCURSOR)
-        {
-            HCURSOR hCursor = (HCURSOR)dwNewLong;
-            if (hCursor && !IsOurComposite(hCursor))
-                dwNewLong = (LONG_PTR)GetOrBuildComposite(hCursor);
-        }
-        ULONG_PTR prev = fpSetClassLongPtrW(hWnd, nIndex, dwNewLong);
-        return nIndex == GCLP_HCURSOR ? (ULONG_PTR)ToLogical((HCURSOR)prev) : prev;
+        return Detour_SetClassLongCommon(fpSetClassLongPtrW, hWnd, nIndex, dwNewLong);
     }
 
     void DestroyCachedComposites()

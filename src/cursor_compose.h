@@ -11,9 +11,10 @@
 // render rate.
 namespace CursorCompose
 {
-    // Returns a new HCURSOR with the current Settings::Outer/Inner rings
-    // drawn around aOriginal's hotspot, or aOriginal itself (unmodified) if
-    // both rings are disabled or compositing fails. Caller owns the
-    // returned handle when it differs from aOriginal and must DestroyIcon it.
+    // Returns a new HCURSOR with the current Settings::Outer/Inner rings and
+    // centre dot drawn around aOriginal's hotspot, or aOriginal itself
+    // (unmodified) if all of them are disabled or compositing fails. Caller
+    // owns the returned handle when it differs from aOriginal and must
+    // DestroyIcon it.
     HCURSOR BuildComposite(HCURSOR aOriginal);
 }

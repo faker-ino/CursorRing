@@ -68,6 +68,21 @@ static void SaveRing(std::ostream& out, const std::string& prefix, const Setting
                                    << "," << ring.Color[2] << "," << ring.Color[3] << "\n";
 }
 
+static void LoadDot(const KV& kv, Settings::DotSettings& dot)
+{
+    dot.Enabled = GetBool (kv, "dot.enabled", dot.Enabled);
+    dot.Size    = GetFloat(kv, "dot.size",    dot.Size);
+    GetColor(kv, "dot.color", dot.Color);
+}
+
+static void SaveDot(std::ostream& out, const Settings::DotSettings& dot)
+{
+    out << "dot.enabled=" << (dot.Enabled ? 1 : 0) << "\n";
+    out << "dot.size="    << dot.Size              << "\n";
+    out << "dot.color="   << dot.Color[0] << "," << dot.Color[1]
+                          << "," << dot.Color[2] << "," << dot.Color[3] << "\n";
+}
+
 void Settings::Load(const char* addonDir)
 {
     std::ifstream f(ConfigPath(addonDir));
@@ -77,6 +92,7 @@ void Settings::Load(const char* addonDir)
 
     LoadRing(kv, "outer", Outer);
     LoadRing(kv, "inner", Inner);
+    LoadDot(kv, Dot);
 }
 
 void Settings::Save(const char* addonDir)
@@ -86,4 +102,5 @@ void Settings::Save(const char* addonDir)
     std::ofstream f(ConfigPath(addonDir));
     SaveRing(f, "outer", Outer);
     SaveRing(f, "inner", Inner);
+    SaveDot(f, Dot);
 }
